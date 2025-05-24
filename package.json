@@ -1,0 +1,26 @@
+{
+	"name": "vihar-api-cf",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev",
+		"start": "wrangler dev",
+		"test": "vitest",
+		"cf-typegen": "wrangler types",
+		"seed:remote": "wrangler d1 execute vihar --file ./src/db/schema.sql --remote",
+		"help": "wrangler --help",
+		"login": "wrangler login",
+		"logout": "wrangler logout",
+		"whoami": "wrangler whoami",
+		"d1:list": "wrangler d1 list",
+		"hello": "wrangler d1 execute vihar --file ./hello.sql --remote"
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.8.19",
+		"@cloudflare/workers-types": "^4.20250521.0",
+		"typescript": "^5.5.2",
+		"vitest": "~3.0.7",
+		"wrangler": "^4.16.1"
+	}
+}
