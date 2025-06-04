@@ -9,7 +9,7 @@ import {
 	softDeleteCustomer,
 	hardDeleteCustomer,
 } from '../services/customerService';
-import { BASE } from '../CONFIG';
+import { BASE, DEFAULT_LIMIT, MAX_LIMIT } from '../CONFIG';
 
 // Functional approach for handling requests
 type RouterHandler = (request: Request, env: Env) => Promise<Response | null>;
@@ -22,15 +22,13 @@ const handleRouteErrors =
 		} catch (error) {
 			console.error('Customer Router Error:', error);
 			const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
-			// Return null or re-throw depending on how `index.ts` is designed to handle unhandled routes/errors
-			// Here, we return a response directly as it's a specific router.
 			return jsonResponse({ error: errorMessage }, 500);
 		}
 	};
 
 const handleGetCustomerRoute: RouterHandler = handleRouteErrors(async (request, env) => {
 	const url = new URL(request.url);
-	const id = parseInt(url.pathname.replace(`${BASE}/customers/`, ''), 10); // Extract ID based on BASE path
+	const id = parseInt(url.pathname.replace(`${BASE}/customers/`, ''), 10);
 
 	if (isNaN(id)) {
 		return jsonResponse({ error: 'Invalid customer ID' }, 400);
@@ -49,11 +47,20 @@ const handleListCustomersRoute: RouterHandler = handleRouteErrors(async (request
 	const url = new URL(request.url);
 	const queryParams = parseQueryParams(url);
 
-	const page = parseInt(queryParams.get('page') || '1', 10);
-	const limit = parseInt(queryParams.get('limit') || '10', 10);
-	const searchTerm = queryParams.get('search') || '';
+	let limit = parseInt(queryParams.get('limit') || DEFAULT_LIMIT.toString(), 10);
+	let offset = parseInt(queryParams.get('offset') || '0', 10);
 
-	const customers = await listCustomers(env, page, limit, searchTerm);
+	// Apply MAX_LIMIT
+	if (limit > MAX_LIMIT) {
+		limit = MAX_LIMIT;
+	}
+
+	// Validate limit and offset
+	if (isNaN(limit) || limit < 1 || isNaN(offset) || offset < 0) {
+		return jsonResponse({ error: 'Invalid limit or offset parameters. Limit must be >= 1, Offset must be >= 0.' }, 400);
+	}
+
+	const customers = await listCustomers(env, limit, offset, queryParams.get('search') || '');
 	return jsonResponse(customers);
 });
 
@@ -72,6 +79,11 @@ const handleUpdateCustomerRoute: RouterHandler = handleRouteErrors(async (reques
 	}
 
 	const updates: Partial<CustomerInput> = await request.json();
+
+	// Ensure there's at least one field to update
+	if (Object.keys(updates).length === 0) {
+		return jsonResponse({ error: 'No update fields provided' }, 400);
+	}
 
 	const updatedCustomer = await updateCustomer(env, id, updates);
 

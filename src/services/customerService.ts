@@ -44,12 +44,12 @@ export const getCustomerDetails = async (env: Env, id: number): Promise<Customer
 	}
 };
 
-export const listCustomers = async (env: Env, page: number, limit: number, searchTerm: string): Promise<PaginatedResult<Customer>> => {
+export const listCustomers = async (env: Env, limit: number, offset: number, searchTerm: string): Promise<PaginatedResult<Customer>> => {
 	try {
-		if (isNaN(page) || page < 1 || isNaN(limit) || limit < 1) {
-			throw new Error('Invalid page or limit parameters.');
+		if (isNaN(limit) || limit < 1 || isNaN(offset) || offset < 0) {
+			throw new Error('Invalid limit or offset parameters.');
 		}
-		return await fetchCustomers(env.DB, page, limit, searchTerm);
+		return await fetchCustomers(env.DB, limit, offset, searchTerm);
 	} catch (error) {
 		handleServiceError(error, 'Failed to list customers');
 		throw error;
@@ -66,27 +66,16 @@ export const updateCustomer = async (env: Env, id: number, updates: Partial<Cust
 			return await getCustomerDetails(env, id);
 		}
 
-		const { project_id, name, address, phone, aadhar, email } = updates;
-
-		const updateObj = {
-			project_id,
-			name,
-			address: address,
-			phone: phone,
-			aadhar: aadhar,
-			email: email,
-		};
-
 		// Business logic for updates, e.g., Aadhar/Email uniqueness check if they are being updated
-		if (aadhar) {
+		if (updates.aadhar) {
 			// Check if Aadhar is already taken by another customer
 			// This would require a new query in customerQueries.ts
 		}
-		if (email) {
+		if (updates.email) {
 			// Check if email is already taken
 		}
 
-		const success = await updateCustomerData(env.DB, id, updateObj);
+		const success = await updateCustomerData(env.DB, id, updates);
 		if (success) {
 			return await getCustomerDetails(env, id); // Fetch the updated customer
 		}

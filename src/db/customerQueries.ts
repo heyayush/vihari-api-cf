@@ -1,5 +1,5 @@
 // src/db/customerQueries.ts
-import { Customer, CustomerInput, PaginatedResult } from '../types';
+import { Customer, CustomerInput, PaginatedResult } from '../types'; // Adjusted import path
 
 // Helper for D1 errors
 const handleD1Error = (error: unknown, message: string) => {
@@ -58,47 +58,40 @@ export const fetchCustomerById = async (db: D1Database, id: number): Promise<Cus
 
 export const fetchCustomers = async (
 	db: D1Database,
-	page: number = 1,
 	limit: number = 10,
+	offset: number = 0,
 	searchTerm: string = ''
 ): Promise<PaginatedResult<Customer>> => {
 	try {
-		const offset = (page - 1) * limit;
-		let query = 'SELECT * FROM customers WHERE is_deleted = 0';
-		let countQuery = 'SELECT COUNT(*) as total_items FROM customers WHERE is_deleted = 0';
+		let baseQuery = 'FROM customers WHERE is_deleted = 0';
 		const params: (string | number)[] = [];
 
 		if (searchTerm) {
 			const searchPattern = `%${searchTerm}%`;
-			query += ' AND (name LIKE ? OR email LIKE ? OR project_id LIKE ?)';
-			countQuery += ' AND (name LIKE ? OR email LIKE ? OR project_id LIKE ?)';
+			baseQuery += ' AND (name LIKE ? OR email LIKE ? OR project_id LIKE ?)';
 			params.push(searchPattern, searchPattern, searchPattern);
 		}
 
-		query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-		params.push(limit, offset);
+		// Fetch total count first
+		const totalItemsResult = await db
+			.prepare(`SELECT COUNT(*) as total_count ${baseQuery}`)
+			.bind(...params)
+			.first<{ total_count: number }>();
+		const totalCount = totalItemsResult ? totalItemsResult.total_count : 0;
 
-		const [customersResult, totalItemsResult] = await Promise.all([
-			db
-				.prepare(query)
-				.bind(...params)
-				.all<Customer>(),
-			db
-				.prepare(countQuery)
-				.bind(...params.slice(0, params.length - 2))
-				.first<{ total_items: number }>(), // Remove limit/offset for count query
-		]);
+		// Fetch paginated data, ordered by updated_at DESC
+		let dataQuery = `SELECT * ${baseQuery} ORDER BY updated_at DESC LIMIT ? OFFSET ?`; // Changed to updated_at DESC
+		const dataParams = [...params, limit, offset]; // Append limit and offset to parameters
 
+		const customersResult = await db
+			.prepare(dataQuery)
+			.bind(...dataParams)
+			.all<Customer>();
 		const customers = customersResult.results || [];
-		const totalItems = totalItemsResult ? totalItemsResult.total_items : 0;
-		const totalPages = Math.ceil(totalItems / limit);
 
 		return {
 			data: customers,
-			page,
-			limit,
-			total_items: totalItems,
-			total_pages: totalPages,
+			count: totalCount,
 		};
 	} catch (error) {
 		handleD1Error(error, 'Error executing fetchCustomers query');
@@ -110,8 +103,6 @@ export const updateCustomerData = async (db: D1Database, id: number, updates: Pa
 	try {
 		const fields: string[] = [];
 		const params: (string | number)[] = [];
-
-		console.log('updates:', updates);
 
 		for (const key in updates) {
 			if (Object.prototype.hasOwnProperty.call(updates, key) && key !== 'id' && key !== 'created_at' && key !== 'is_deleted') {
@@ -126,11 +117,6 @@ export const updateCustomerData = async (db: D1Database, id: number, updates: Pa
 
 		fields.push('updated_at = CURRENT_TIMESTAMP');
 		params.push(id); // ID is the last parameter for WHERE clause
-
-		console.log('fields:', JSON.stringify(fields));
-		console.log('params:', JSON.stringify(params));
-
-		console.log(`Executing updateCustomerData => UPDATE customers SET ${fields.join(', ')} WHERE id = ? AND is_deleted = 0`);
 
 		const stmt = db.prepare(`UPDATE customers SET ${fields.join(', ')} WHERE id = ? AND is_deleted = 0`);
 		const { success } = await stmt.bind(...params).run();

@@ -23,24 +23,24 @@ paths:
     get:
       tags:
         - Customers
-      summary: Get a list of customers with pagination and search
+      summary: Get a list of customers with limit, offset, and search
       operationId: listCustomers
       parameters:
-        - in: query
-          name: page
-          schema:
-            type: integer
-            default: 1
-            minimum: 1
-          description: Page number for pagination
         - in: query
           name: limit
           schema:
             type: integer
             default: 10
             minimum: 1
-            maximum: 100
-          description: Number of customers per page
+            maximum: 50 # Updated MAX_LIMIT
+          description: Maximum number of customers to return (default 10, max 50)
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: The number of items to skip before starting to collect the result set
         - in: query
           name: search
           schema:
@@ -48,7 +48,7 @@ paths:
           description: Search term for customer name, email, or project ID
       responses:
         200:
-          description: A paginated list of customers
+          description: A list of customers with total count, ordered by updated_at DESC.
           content:
             application/json:
               schema:
@@ -137,10 +137,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-    put:
+    patch: # Changed from put to patch
       tags:
         - Customers
-      summary: Update an existing customer
+      summary: Update an existing customer (partial update)
       operationId: updateCustomer
       parameters:
         - in: path
@@ -387,27 +387,15 @@ components:
       type: object
       required:
         - data
-        - page
-        - limit
-        - total_items
-        - total_pages
+        - count
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/Customer'
-        page:
-          type: integer
-          example: 1
-        limit:
-          type: integer
-          example: 10
-        total_items:
+        count:
           type: integer
           example: 50
-        total_pages:
-          type: integer
-          example: 5
     ErrorResponse:
       type: object
       required:

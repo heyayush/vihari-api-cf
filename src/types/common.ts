@@ -6,8 +6,5 @@ export interface Env {
 
 export interface PaginatedResult<T> {
 	data: T[];
-	page: number;
-	limit: number;
-	total_items: number;
-	total_pages: number;
+	count: number;
 }
